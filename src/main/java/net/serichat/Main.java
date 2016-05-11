@@ -52,7 +52,7 @@ public class Main {
         FutureDHT futureDHT = peer.get(Number160.createHash(name)).start();
         futureDHT.awaitUninterruptibly();
         if (futureDHT.isSuccess()) {
-            return futureDHT.get
+            return futureDHT.ge
         }
         return "not found";
     }
