@@ -38,18 +38,18 @@ public class User {
 
     }
 
-    /*public void createGroup(String groupName, Number160 ownerId, String password) {
-        net.serichat.Group group = new net.serichat.Group(groupName, ownerId, password);
-        groups.put(ownerId, group);
+    public void createGroup(String groupName, Number160 ownerPeerId, String password) {
+        net.serichat.Group group = new net.serichat.Group(groupName, ownerPeerId, password);
+        groups.put(ownerPeerId, group);
 
-        net.serichat.Admin admin = new net.serichat.Admin(ownerId, password);
-        admins.put(ownerId, admin);
+        net.serichat.Admin admin = new net.serichat.Admin(ownerPeerId, password);
+        admins.put(ownerPeerId, admin);
 
         //diffie-hellman
         //KeyAgreement keyAgreement;
         //keyAgreement.getAlgorithm("Diffie-Hellman");
 
-    }*/
+    }
 
     public void sendMsg(String msg, int groupId) {
         if(!admins.containsKey(groupId)) {

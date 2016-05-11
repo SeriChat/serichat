@@ -7,6 +7,7 @@ import net.tomp2p.futures.FutureBootstrap;
 import net.tomp2p.futures.FutureDHT;
 import net.tomp2p.p2p.Peer;
 import net.tomp2p.p2p.PeerMaker;
+import net.tomp2p.p2p.builder.DiscoverBuilder;
 import net.tomp2p.peers.Number160;
 import net.tomp2p.peers.PeerAddress;
 import net.tomp2p.rpc.ObjectDataReply;
@@ -37,9 +38,10 @@ public class Main {
         peer.setObjectDataReply(new ObjectDataReply() {
 
             public Object reply(final PeerAddress sender, final Object request) throws Exception {
-                if(!peer.getPeerID().toString().equals(sender.getID().toString())) { // Workaround!!
+                //if(!peer.getPeerID().toString().equals(sender.getID().toString())) { // Workaround!!
+
                     System.out.println("ObjectData says Msg: " + request.toString() + ", from: " + sender.getID());
-                }
+                //}
                 return "world!";
             }
         });
@@ -53,17 +55,17 @@ public class Main {
         }
         if (arg.length == 2) {
             //System.out.println("Key: " + arg[1] + " is at the node with this ID: " + dns.get(arg[1]));
-            dns.peer.send(Number160.createHash(arg[1])).setObject("Hello").start();
+            dns.peer.sendDirect((PeerAddress) dns.get(arg[1])).setObject("Hello").start();
         }
     }
 
-    private String get(String name) throws ClassNotFoundException, IOException {
+    private Object get(String name) throws ClassNotFoundException, IOException {
         FutureDHT futureDHT = peer.get(Number160.createHash(name)).start();
         futureDHT.awaitUninterruptibly();
         if (futureDHT.isSuccess()) {
-            return futureDHT.getData().getPeerId().toString();
+            return futureDHT.getRawData().keySet().toArray()[0];
         }
-        return "not found";
+        return null;
     }
 
     private void store(String name, String ip) throws IOException {
@@ -82,4 +84,16 @@ public class MyStorageMemory extends StorageMemory {
             super.put(locationKey, domainKey, null, publicKey, putIfAbsent, domainProtection);
         }
     }
-}*/
+}
+
+	private static void exampleSendOne(PeerDHT peer) {
+		RequestP2PConfiguration requestP2PConfiguration = new RequestP2PConfiguration(1, 10, 0);
+		FutureSend futureSend = peer.send(Number160.createHash("key")).object("hello")
+		        .requestP2PConfiguration(requestP2PConfiguration).start();
+		futureSend.awaitUninterruptibly();
+		for (Object object : futureSend.rawDirectData2().values()) {
+			System.err.println("got:" + object);
+		}
+	}
+
+*/
