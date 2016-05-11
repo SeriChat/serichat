@@ -27,10 +27,10 @@ public class Main {
 
         peer.setRawDataReply(new RawDataReply() {
             public org.jboss.netty.buffer.ChannelBuffer reply(PeerAddress sender, org.jboss.netty.buffer.ChannelBuffer requestBuffer) throws Exception {
-                if(!peer.getPeerID().toString().equals(sender.getID().toString())) { // Workaround!!
-                    System.out.println("Msg: " + requestBuffer.toString() + ", from: " + sender.getID());
-                }
-                return null;
+                //if(!peer.getPeerID().toString().equals(sender.getID().toString())) { // Workaround!!
+                    System.out.println("RawData says Msg: " + requestBuffer.toString() + ", from: " + sender.getID());
+                //}
+                return requestBuffer;
             }
         });
 
@@ -38,7 +38,7 @@ public class Main {
 
             public Object reply(final PeerAddress sender, final Object request) throws Exception {
                 if(!peer.getPeerID().toString().equals(sender.getID().toString())) { // Workaround!!
-                    System.out.println("Msg: " + request.toString() + ", from: " + sender.getID());
+                    System.out.println("ObjectData says Msg: " + request.toString() + ", from: " + sender.getID());
                 }
                 return "world!";
             }
