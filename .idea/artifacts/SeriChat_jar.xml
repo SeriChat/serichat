@@ -3,15 +3,16 @@
     <output-path>$PROJECT_DIR$/out/artifacts/SeriChat_jar</output-path>
     <root id="archive" name="SeriChat.jar">
       <element id="module-output" name="SeriChat" />
-      <element id="extracted-dir" path="$USER_HOME$/Downloads/TomP2P-4.4/TomP2P-4.4.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Downloads/TomP2P-4.4/lib/junit-4.10.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Downloads/TomP2P-4.4/lib/jdbm-3.0-alpha.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Downloads/TomP2P-4.4/lib/slf4j-api-1.6.4.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Downloads/TomP2P-4.4/lib/hamcrest-core-1.1.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Downloads/TomP2P-4.4/lib/json-simple-1.1.1.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Downloads/TomP2P-4.4/lib/logback-core-1.0.1.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Downloads/TomP2P-4.4/lib/netty-3.5.3.Patched.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Downloads/TomP2P-4.4/lib/logback-classic-1.0.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/netty-3.2.10.Final.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/TomP2P-4.4/lib/hamcrest-core-1.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/TomP2P-4.4/lib/jdbm-3.0-alpha.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/TomP2P-4.4/lib/json-simple-1.1.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/TomP2P-4.4/lib/junit-4.10.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/TomP2P-4.4/lib/logback-classic-1.0.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/TomP2P-4.4/lib/logback-core-1.0.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/TomP2P-4.4/lib/netty-3.5.3.Patched.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/TomP2P-4.4/lib/slf4j-api-1.6.4.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/TomP2P-4.4/TomP2P-4.4.jar" path-in-jar="/" />
     </root>
   </artifact>
 </component>

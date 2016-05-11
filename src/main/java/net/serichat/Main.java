@@ -10,6 +10,7 @@ import net.tomp2p.p2p.PeerMaker;
 import net.tomp2p.peers.Number160;
 import net.tomp2p.peers.PeerAddress;
 import net.tomp2p.rpc.ObjectDataReply;
+import net.tomp2p.rpc.RawDataReply;
 import net.tomp2p.storage.Data;
 
 public class Main {
@@ -23,6 +24,15 @@ public class Main {
         if (fb.getBootstrapTo() != null) {
             peer.discover().setPeerAddress(fb.getBootstrapTo().iterator().next()).start().awaitUninterruptibly();
         }
+
+        peer.setRawDataReply(new RawDataReply() {
+            public org.jboss.netty.buffer.ChannelBuffer reply(PeerAddress sender, org.jboss.netty.buffer.ChannelBuffer requestBuffer) throws Exception {
+                if(!peer.getPeerID().toString().equals(sender.getID().toString())) { // Workaround!!
+                    System.out.println("Msg: " + requestBuffer.toString() + ", from: " + sender.getID());
+                }
+                return null;
+            }
+        });
 
         peer.setObjectDataReply(new ObjectDataReply() {
 
@@ -44,7 +54,6 @@ public class Main {
         if (arg.length == 2) {
             //System.out.println("Key: " + arg[1] + " is at the node with this ID: " + dns.get(arg[1]));
             dns.peer.send(Number160.createHash(arg[1])).setObject("Hello").start();
-            dns.peer.sendDirect(dns.get(arg[1]));
         }
     }
 
@@ -52,7 +61,7 @@ public class Main {
         FutureDHT futureDHT = peer.get(Number160.createHash(name)).start();
         futureDHT.awaitUninterruptibly();
         if (futureDHT.isSuccess()) {
-            return futureDHT.ge
+            return futureDHT.getData().getPeerId().toString();
         }
         return "not found";
     }

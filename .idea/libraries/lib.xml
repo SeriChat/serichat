@@ -1,13 +1,22 @@
 <component name="libraryTable">
   <library name="lib">
     <CLASSES>
-      <root url="file://$PROJECT_DIR$/TomP2P-4.4" />
+      <root url="jar://$PROJECT_DIR$/netty-3.2.10.Final.jar!/" />
+      <root url="jar://$PROJECT_DIR$/TomP2P-4.4/lib/hamcrest-core-1.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/TomP2P-4.4/lib/jdbm-3.0-alpha.jar!/" />
+      <root url="jar://$PROJECT_DIR$/TomP2P-4.4/lib/json-simple-1.1.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/TomP2P-4.4/lib/junit-4.10.jar!/" />
+      <root url="jar://$PROJECT_DIR$/TomP2P-4.4/lib/logback-classic-1.0.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/TomP2P-4.4/lib/logback-core-1.0.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/TomP2P-4.4/lib/netty-3.5.3.Patched.jar!/" />
+      <root url="jar://$PROJECT_DIR$/TomP2P-4.4/lib/slf4j-api-1.6.4.jar!/" />
+      <root url="jar://$PROJECT_DIR$/TomP2P-4.4/TomP2P-4.4.jar!/" />
     </CLASSES>
-    <JAVADOC />
+    <JAVADOC>
+      <root url="jar://$PROJECT_DIR$/TomP2P-4.4/TomP2P-4.4-javadoc.jar!/" />
+    </JAVADOC>
     <SOURCES>
-      <root url="file://$PROJECT_DIR$/TomP2P-4.4" />
+      <root url="jar://$PROJECT_DIR$/TomP2P-4.4/TomP2P-4.4-sources.jar!/" />
     </SOURCES>
-    <jarDirectory url="file://$PROJECT_DIR$/TomP2P-4.4" recursive="false" />
-    <jarDirectory url="file://$PROJECT_DIR$/TomP2P-4.4" recursive="false" type="SOURCES" />
   </library>
 </component>
