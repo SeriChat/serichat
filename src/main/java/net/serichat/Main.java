@@ -26,15 +26,6 @@ public class Main {
             peer.discover().setPeerAddress(fb.getBootstrapTo().iterator().next()).start().awaitUninterruptibly();
         }
 
-        peer.setRawDataReply(new RawDataReply() {
-            public org.jboss.netty.buffer.ChannelBuffer reply(PeerAddress sender, org.jboss.netty.buffer.ChannelBuffer requestBuffer) throws Exception {
-                //if(!peer.getPeerID().toString().equals(sender.getID().toString())) { // Workaround!!
-                    System.out.println("RawData says Msg: " + requestBuffer.toString() + ", from: " + sender.getID());
-                //}
-                return requestBuffer;
-            }
-        });
-
         peer.setObjectDataReply(new ObjectDataReply() {
 
             public Object reply(final PeerAddress sender, final Object request) throws Exception {
