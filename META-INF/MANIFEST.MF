@@ -1,0 +1,4 @@
+Manifest-Version: 1.0
+Class-Path: lib
+net.serichat.Main-Class: net.serichat.Main
+
