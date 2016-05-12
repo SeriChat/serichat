@@ -38,7 +38,7 @@ public class User {
 
     }
 
-    public void createGroup(String groupName, Number160 ownerPeerId, String password) {
+   /* public void createGroup(String groupName, Number160 ownerPeerId, String password) {
         net.serichat.Group group = new net.serichat.Group(groupName, ownerPeerId, password);
         groups.put(ownerPeerId, group);
 
@@ -50,7 +50,7 @@ public class User {
         //keyAgreement.getAlgorithm("Diffie-Hellman");
 
     }
-
+*/
     public void sendMsg(String msg, int groupId) {
         if(!admins.containsKey(groupId)) {
 
