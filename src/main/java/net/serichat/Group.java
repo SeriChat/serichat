@@ -6,15 +6,28 @@ import net.tomp2p.peers.Number160;
 /**
  * Created by khaledsaied on 27/04/16.
  */
+
 public class Group {
 
+    private String groupName;
     private Number160 groupId;
+    private Peer ownerPeer;
+    private String password;
     private String groupKey;
     private Peer rightChild;
     private Peer leftChild;
+    private Roles role;
 
-    public Group(Number160 groupId) {
+    public Group(String groupName, Number160 groupId, Peer ownerPeer, String password ) {
+        this.groupName = groupName;
         this.groupId = groupId;
+        this.ownerPeer = ownerPeer;
+        this.password = password;
+        role = Roles.OWNER;
+    }
+
+    public Group () {
+
     }
 
     public Number160 getGroupId() {

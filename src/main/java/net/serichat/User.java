@@ -3,7 +3,9 @@ package net.serichat;
 import net.tomp2p.futures.FutureDHT;
 import net.tomp2p.p2p.Peer;
 import net.tomp2p.peers.Number160;
+import net.tomp2p.storage.Data;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -12,14 +14,12 @@ import java.util.Map;
  */
 public class User {
 
-    private Map<Number160,Group> groups;
-    private Map<Number160,Admin> admins;
-    private Map<Number160,Root> roots;
+    private Map<String,Group> groups;
+    //private Map<Number160,Admin> admins;
+    //private Map<Number160,Root> roots;
 
     public User() {
-        groups = new HashMap<Number160, Group>();
-        admins = new HashMap<Number160, Admin>();
-        roots = new HashMap<Number160, Root>();
+        groups = new HashMap<String, Group>();
     }
     //test
     public void join(Peer myPeer, Number160 groupId, String password) {
@@ -30,34 +30,35 @@ public class User {
              //futureDHT.getData().getObject().toString();
         }
 
-        groups.put(groupId, new Group(groupId));
-        roots.put(groupId, new Root("",0));
+        //groups.put(groupId, new Group(groupId));
+        //roots.put(groupId, new Root("",0));
     }
 
     public void leave() {
 
     }
 
-    public void createGroup(String groupName, Number160 ownerPeerId, String password) {
-        net.serichat.Group group = new net.serichat.Group(groupName, ownerPeerId, password);
-        groups.put(ownerPeerId, group);
-
-        net.serichat.Admin admin = new net.serichat.Admin(ownerPeerId, password);
-        admins.put(ownerPeerId, admin);
-
-        //diffie-hellman
-        //KeyAgreement keyAgreement;
-        //keyAgreement.getAlgorithm("Diffie-Hellman");
+    public void createGroup(String groupName, Peer ownerPeer, String password) {
+        Number160 groupId = Number160.createHash(groupName);
+        try {
+            if (TomP2PExtras.findReference(ownerPeer, groupId) == null) {
+                Group group = new Group(groupName, groupId, ownerPeer, password);
+                groups.put(groupName, group);
+                ownerPeer.put(groupId).setData(new Data(groupName)).start().awaitUninterruptibly();
+            }
+            else {
+                System.out.println("Group name allready exists!");
+            }
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
     }
 
     public void sendMsg(String msg, int groupId) {
-        if(!admins.containsKey(groupId)) {
 
-        }
-        else {
-
-        }
     }
 
     public void stabilization() {
