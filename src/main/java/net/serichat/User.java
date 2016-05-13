@@ -3,6 +3,7 @@ package net.serichat;
 import net.tomp2p.futures.FutureDHT;
 import net.tomp2p.p2p.Peer;
 import net.tomp2p.peers.Number160;
+import net.tomp2p.peers.PeerAddress;
 import net.tomp2p.storage.Data;
 
 import java.io.IOException;
@@ -14,20 +15,30 @@ import java.util.Map;
  */
 public class User {
 
+    String nickName;
     private Map<String,Group> groups;
     //private Map<Number160,Admin> admins;
     //private Map<Number160,Root> roots;
 
-    public User() {
+    public User(String nickName) {
+        this.nickName = nickName;
         groups = new HashMap<String, Group>();
     }
     //test
-    public void join(Peer myPeer, Number160 groupId, String password) {
-        //Look root up and contact him...
-        FutureDHT futureDHT = myPeer.get(groupId).start();
-        futureDHT.awaitUninterruptibly();
-        if (futureDHT.isSuccess()) {
-             //futureDHT.getData().getObject().toString();
+    public void join(String groupName, String password, Peer joiningPeer) {
+        Number160 groupId = Number160.createHash(groupName);
+        try {
+            PeerAddress rootAddress = TomP2PExtras.findReference(groupId, joiningPeer);
+            if (rootAddress != null) {
+                joiningPeer.sendDirect(rootAddress).setObject("").start().awaitUninterruptibly();
+            }
+            else {
+                System.out.println("Group does not exist!");
+            }
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
 
         //groups.put(groupId, new Group(groupId));
@@ -41,7 +52,7 @@ public class User {
     public void createGroup(String groupName, Peer ownerPeer, String password) {
         Number160 groupId = Number160.createHash(groupName);
         try {
-            if (TomP2PExtras.findReference(ownerPeer, groupId) == null) {
+            if (TomP2PExtras.findReference(groupId, ownerPeer) == null) {
                 Group group = new Group(groupName, groupId, ownerPeer, password);
                 groups.put(groupName, group);
                 ownerPeer.put(groupId).setData(new Data(groupName)).start().awaitUninterruptibly();

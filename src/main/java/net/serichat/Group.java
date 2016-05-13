@@ -16,14 +16,14 @@ public class Group {
     private String groupKey;
     private Peer rightChild;
     private Peer leftChild;
-    private Roles role;
+    private Role role;
 
     public Group(String groupName, Number160 groupId, Peer ownerPeer, String password ) {
         this.groupName = groupName;
         this.groupId = groupId;
         this.ownerPeer = ownerPeer;
         this.password = password;
-        role = Roles.OWNER;
+        role = Role.OWNER;
     }
 
     public Group () {

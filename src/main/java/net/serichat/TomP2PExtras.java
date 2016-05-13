@@ -3,6 +3,7 @@ package net.serichat;
 import net.tomp2p.futures.FutureDHT;
 import net.tomp2p.p2p.Peer;
 import net.tomp2p.peers.Number160;
+import net.tomp2p.peers.PeerAddress;
 
 import java.io.IOException;
 
@@ -25,15 +26,15 @@ public final class TomP2PExtras {
      * @throws ClassNotFoundException .
      * @throws IOException .
      */
-    public static Number160 findReference(final Peer peer, final Number160 key) throws ClassNotFoundException,
+    public static PeerAddress findReference(final Number160 key, final Peer peer) throws ClassNotFoundException,
             IOException {
         FutureDHT futureDHT = peer.get(key).start();
         futureDHT.awaitUninterruptibly();
         if(futureDHT.getData() == null) {
             return null;
         }
-        Number160 termKey = (Number160) futureDHT.getData().getObject();
-        return termKey;
+        PeerAddress address = (PeerAddress)futureDHT.getRawData().keySet().toArray()[0];
+        return address;
     }
 
     private Object get(String name, Peer peer) throws ClassNotFoundException, IOException {
