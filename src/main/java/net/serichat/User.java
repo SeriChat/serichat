@@ -30,7 +30,8 @@ public class User {
         try {
             PeerAddress rootAddress = TomP2PExtras.findReference(groupId, joiningPeer);
             if (rootAddress != null) {
-                joiningPeer.sendDirect(rootAddress).setObject("").start().awaitUninterruptibly();
+                SeriMsg seriMsg = new SeriMsg(MsgType.JOIN, password, );
+                joiningPeer.sendDirect(rootAddress).setObject().start().awaitUninterruptibly();
             }
             else {
                 System.out.println("Group does not exist!");
