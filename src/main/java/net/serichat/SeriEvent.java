@@ -9,12 +9,17 @@ public class SeriEvent {
     EventType eventType;
     String password;
     String senderNickName;
-    PeerAddress senderAddress;
+    String chatMsg;
+    String groupName;
 
-    public SeriEvent(EventType eventType, String password, String senderNickName, PeerAddress senderAddress) {
+    public SeriEvent(EventType eventType, String password, String senderNickName) {
         this.eventType = eventType;
         this.password = password;
         this.senderNickName = senderNickName;
-        this.senderAddress = senderAddress;
+    }
+
+    public SeriEvent(String groupName, String chatMsg) {
+        this.groupName = groupName;
+        this.chatMsg = chatMsg;
     }
 }
