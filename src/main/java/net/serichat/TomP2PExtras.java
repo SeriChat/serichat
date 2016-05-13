@@ -37,10 +37,10 @@ public final class TomP2PExtras {
         return address;
     }
 
-    private Object get(String name, Peer peer) throws ClassNotFoundException, IOException {
-        FutureDHT futureDHT = peer.get(Number160.createHash(name)).start();
+    private Object findPeer(final Number160 peerId, final Peer peer) throws ClassNotFoundException, IOException {
+        FutureDHT futureDHT = peer.get(peerId).start();
         futureDHT.awaitUninterruptibly();
-        if (futureDHT.isSuccess()) {
+        if (futureDHT.isSuccess() && futureDHT.getData().getPeerId() == peerId) {
             return futureDHT.getRawData().keySet().toArray()[0];
         }
         return null;
