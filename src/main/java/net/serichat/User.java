@@ -29,8 +29,8 @@ public class User {
         try {
             PeerAddress rootAddress = TomP2PExtras.findReference(groupId, joiningPeer);
             if (rootAddress != null) {
-                SeriMsg seriMsg = new SeriMsg(MsgType.JOIN, password, );
-                joiningPeer.sendDirect(rootAddress).setObject().start().awaitUninterruptibly();
+                SeriEvent seriEvent = new SeriEvent(EventType.JOIN, password, nickName);
+                joiningPeer.sendDirect(rootAddress).setObject(seriEvent).start().awaitUninterruptibly();
             }
             else {
                 System.out.println("Group does not exist!");
@@ -53,9 +53,10 @@ public class User {
         Number160 groupId = Number160.createHash(groupName);
         try {
             if (TomP2PExtras.findReference(groupId, ownerPeer) == null) {
-                Group group = new Group(groupName, groupId, ownerPeer, password);
-                groups.put(groupName, group);
                 ownerPeer.put(groupId).setData(new Data(groupName)).start().awaitUninterruptibly();
+                PeerAddress rootAddress = TomP2PExtras.findReference(groupId, ownerPeer);
+                Group group = new Group(groupName, groupId, ownerPeer, rootAddress, password);
+                groups.put(groupName, group);
             }
             else {
                 System.out.println("Group name allready exists!");
@@ -69,7 +70,7 @@ public class User {
     }
 
     public void sendMsg(String msg, String groupName) {
-       // SeriEvent message = new SeriEvent();
+        //SeriEvent message = new SeriEvent();
         //message.= msg;
     }
 
