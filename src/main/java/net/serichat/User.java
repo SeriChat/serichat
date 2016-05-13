@@ -1,6 +1,5 @@
 package net.serichat;
 
-import net.tomp2p.futures.FutureDHT;
 import net.tomp2p.p2p.Peer;
 import net.tomp2p.peers.Number160;
 import net.tomp2p.peers.PeerAddress;
@@ -68,8 +67,9 @@ public class User {
 
     }
 
-    public void sendMsg(String msg, int groupId) {
-
+    public void sendMsg(String msg, String groupName) {
+       // SeriEvent message = new SeriEvent();
+        //message.= msg;
     }
 
     public void stabilization() {
