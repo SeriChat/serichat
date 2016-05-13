@@ -29,8 +29,8 @@ public class User {
         try {
             PeerAddress rootAddress = TomP2PExtras.findReference(groupId, joiningPeer);
             if (rootAddress != null) {
-                SeriEvent seriEvent = new SeriEvent(EventType.JOIN, password, nickName);
-                joiningPeer.sendDirect(rootAddress).setObject(seriEvent).start().awaitUninterruptibly();
+                SeriMsg seriMsg = new SeriMsg(MsgType.JOIN, password, );
+                joiningPeer.sendDirect(rootAddress).setObject().start().awaitUninterruptibly();
             }
             else {
                 System.out.println("Group does not exist!");
@@ -69,9 +69,17 @@ public class User {
 
     }
 
-    public void sendMsg(String msg, String groupName) {
-        //SeriEvent message = new SeriEvent();
-        //message.= msg;
+    public void sendMsg(String groupName, Peer sendingPeer, String msg) {
+
+        SeriEvent message = new SeriEvent(groupName, msg);
+        Group group = groups.get(groupName);
+        if(group.getRole() != Role.ROOT){
+            PeerAddress root = group.getRoot();
+            sendingPeer.sendDirect(root).setObject(message).start().awaitUninterruptibly();
+        }
+        else {
+
+        }
     }
 
     public void stabilization() {
