@@ -10,4 +10,11 @@ public class SeriMsg {
     String password;
     String senderNickName;
     PeerAddress senderAddress;
+
+    public SeriMsg(MsgType msgType, String password, String senderNickName, PeerAddress senderAddress) {
+        this.msgType = msgType;
+        this.password = password;
+        this.senderNickName = senderNickName;
+        this.senderAddress = senderAddress;
+    }
 }
