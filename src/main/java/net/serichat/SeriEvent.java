@@ -1,5 +1,7 @@
 package net.serichat;
 
+import net.tomp2p.peers.PeerAddress;
+
 import javax.crypto.SecretKey;
 import java.io.*;
 import java.security.PublicKey;
@@ -17,6 +19,7 @@ public class SeriEvent implements Serializable {
     private String ownerNickName;
     private byte[] grpSecretKey;
     private PublicKey publicKey;
+    private PeerAddress joinedPeer;
 
 
     public SeriEvent(EventType type, String groupName, String ownerNickName, byte[] password, byte[] grpSecretKey) {
@@ -39,6 +42,11 @@ public class SeriEvent implements Serializable {
         this.groupName = groupName;
         this.chatMsg = chatMsg;
         this.senderNickName = senderNickName;
+    }
+
+    public SeriEvent(EventType type, String groupName, PeerAddress joinedPeer) {
+        this.type = type;
+        this.joinedPeer = joinedPeer;
     }
 
     public SeriEvent(byte[] serializedEvent) {
@@ -106,5 +114,9 @@ public class SeriEvent implements Serializable {
 
     public PublicKey getPublicKey() {
         return publicKey;
+    }
+
+    public PeerAddress getJoinedPeer() {
+        return joinedPeer;
     }
 }

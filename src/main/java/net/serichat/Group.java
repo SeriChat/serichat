@@ -97,4 +97,18 @@ public class Group {
     public void setLeftChild(PeerAddress leftChild) {
         this.leftChild = leftChild;
     }
+
+    public boolean setChild(PeerAddress child) {
+        if(rightChild == null) {
+            rightChild = child;
+            return true;
+        }
+        else if(leftChild == null) {
+            leftChild = child;
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
 }

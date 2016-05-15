@@ -32,25 +32,27 @@ public class SeriChat implements Serializable {
     private String nickName;
     private Map<String,Group> groups;
     private KeyPair keyPair;
+    private Direction direction;
 
 
     public SeriChat(String nickName, KeyPair keyPair) {
         this.nickName = nickName;
-        groups = new HashMap<String, Group>();
+        this.groups = new HashMap<String, Group>();
         this.keyPair = keyPair;
+        this.direction = Direction.RGIHT;
     }
-    //test
+    //TODO: What if the key is moved?
     public void join(String groupName, String password, PeerDHT joiningPeerDHT) {
         LOG.info("Joining: " + groupName);
         Number160 groupId = Number160.createHash(groupName);
         try {
             FutureGet futureGet = joiningPeerDHT.get(groupId).start();
             futureGet.awaitUninterruptibly();
-            LOG.debug("joiningPeerDHT got: " + futureGet.data());
+            LOG.info("joiningPeerDHT got: " + futureGet.data());
             PeerAddress rootAddress = (PeerAddress) futureGet.rawData().keySet().toArray()[0];
             PublicKey rootPublicKey = (PublicKey) futureGet.data().object();
             if (rootAddress != null) {
-                LOG.debug("Root for " + groupName + "'s chat group: " + rootAddress.peerId() + " peerId");
+                LOG.info("Root for " + groupName + "'s chat group: " + rootAddress.peerId() + " peerId");
                 Cipher cipher = Cipher.getInstance("RSA");
                 cipher.init(Cipher.ENCRYPT_MODE, rootPublicKey);
                 byte[] cipheredPassword = cipher.doFinal(password.getBytes());
@@ -59,7 +61,7 @@ public class SeriChat implements Serializable {
                 futureResponse.awaitUninterruptibly();
                 byte[] response = (byte[]) futureResponse.responseMessage().buffer(0).object();
                 if (response != null) {
-                    LOG.debug("Public key is received");
+                    LOG.info("Public key is received");
                     cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
                     byte[] grpSecretKeyBytes = cipher.doFinal(response);
                     SecretKey grpSecretKey = new SecretKeySpec(grpSecretKeyBytes, 0, grpSecretKeyBytes.length, "AES");
@@ -119,7 +121,7 @@ public class SeriChat implements Serializable {
                 byte[] cipheredPassword = cipher.doFinal(password.getBytes());
 
                 SeriEvent createEvent = new SeriEvent(EventType.CREATE, groupName, nickName, cipheredPassword, cipheredGrpAESKey);
-                LOG.debug("createEvent length: " + createEvent.serialize().length + " bytes \n");
+                LOG.info("createEvent length: " + createEvent.serialize().length + " bytes \n");
 
                 ownerPeerDHT.peer().sendDirect(rootAddress).object(createEvent.serialize()).start().awaitUninterruptibly();
 
@@ -180,9 +182,9 @@ public class SeriChat implements Serializable {
 
     }
 
-    public Object handleEvent(SeriEvent event, PeerAddress sender) {
+    public Object handleEvent(SeriEvent event, PeerAddress sender, PeerDHT receiverPeerDHT) {
         Cipher cipher = null;
-        LOG.debug("handling Seri Event...");
+        LOG.info("handling Seri Event...");
         switch (event.getType()) {
             case CHAT:
                 return null;
@@ -202,6 +204,9 @@ public class SeriChat implements Serializable {
                             event.getOwnerNickName(),
                             password);
                     groups.put(group.getGroupName(), group);
+                    if(sender.peerId() != receiverPeerDHT.peer().peerID()) {
+                        group.setRightChild(sender);
+                    }
                 } catch (NoSuchAlgorithmException e) {
                     e.printStackTrace();
                 } catch (NoSuchPaddingException e) {
@@ -226,9 +231,24 @@ public class SeriChat implements Serializable {
                         cipher = Cipher.getInstance("RSA");
                         cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
                         String password = new String(cipher.doFinal(event.getPassword()));
-                        LOG.debug("Handling join event: Group name=" + groupToJoin + " pass=" + password);
+                        LOG.info("Handling join event: Group name=" + groupToJoin.getGroupName() + " pass=" + password);
                         if (groupToJoin.getPassword().equals(password)) {
                             cipher.init(Cipher.ENCRYPT_MODE, event.getPublicKey());
+                            if(!groupToJoin.setChild(sender)) {
+                                SeriEvent forwardJoinEvent = new SeriEvent(EventType.FORWARD_JOIN, groupToJoin.getGroupName(), sender);
+                                if(direction == Direction.RGIHT) {
+                                    LOG.info("Forwarding peer(" + sender.peerId() + ") to the right");
+                                    receiverPeerDHT.peer().sendDirect(groupToJoin.getRightChild()).object(forwardJoinEvent.serialize())
+                                            .start().awaitUninterruptibly();
+                                    direction = Direction.LEFT;
+                                }
+                                else if (direction == Direction.LEFT){
+                                    LOG.info("Forwarding peer(" + sender.peerId() + ") to the left");
+                                    receiverPeerDHT.peer().sendDirect(groupToJoin.getLeftChild()).object(forwardJoinEvent.serialize())
+                                            .start().awaitUninterruptibly();
+                                    direction = Direction.RGIHT;
+                                }
+                            }
                             return cipher.doFinal(groupToJoin.getGrpAESKey().getEncoded());
                         }
                         return null;
@@ -243,7 +263,30 @@ public class SeriChat implements Serializable {
                     e.printStackTrace();
                 } catch (InvalidKeyException e) {
                     e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
+            case FORWARD_JOIN:
+                Group groupToJoin = groups.get(event.getGroupName());
+                if(!groupToJoin.setChild(sender)) {
+                    try {
+                        if(direction == Direction.RGIHT) {
+                            LOG.info("Forwarding peer(" + event.getJoinedPeer().peerId() + ") to the right");
+                                receiverPeerDHT.peer().sendDirect(groupToJoin.getRightChild()).object(event.serialize())
+                                        .start().awaitUninterruptibly();
+                            direction = Direction.LEFT;
+                        }
+                        else if (direction == Direction.LEFT){
+                            LOG.info("Forwarding peer(" + event.getJoinedPeer().peerId() + ") to the left");
+                            receiverPeerDHT.peer().sendDirect(groupToJoin.getLeftChild()).object(event.serialize())
+                                    .start().awaitUninterruptibly();
+                            direction = Direction.RGIHT;
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+                return null;
             case LEAVE:
             default:
                 return null;

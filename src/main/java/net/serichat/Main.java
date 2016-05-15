@@ -81,7 +81,7 @@ public class Main {
 
                 LOG.info("YAAAAY, it is an event from " + seriEvent.getGroupName());
 
-                return seriChat.handleEvent(seriEvent, sender);
+                return seriChat.handleEvent(seriEvent, sender, peerDHT);
             }
         });
 
