@@ -1,6 +1,7 @@
 package net.serichat;
 
 import com.sun.corba.se.impl.orbutil.closure.Future;
+import com.sun.xml.internal.bind.v2.runtime.unmarshaller.Receiver;
 import net.tomp2p.connection.PeerBean;
 import net.tomp2p.dht.FutureGet;
 import net.tomp2p.dht.PeerDHT;
@@ -40,10 +41,12 @@ public class SeriChat implements Serializable {
     }
     //test
     public void join(String groupName, String password, PeerDHT joiningPeerDHT) {
+        LOG.info("Joining: " + groupName);
         Number160 groupId = Number160.createHash(groupName);
         try {
             FutureGet futureGet = joiningPeerDHT.get(groupId).start();
             futureGet.awaitUninterruptibly();
+            LOG.debug("joiningPeerDHT got: " + futureGet.data());
             PeerAddress rootAddress = (PeerAddress) futureGet.rawData().keySet().toArray()[0];
             PublicKey rootPublicKey = (PublicKey) futureGet.data().object();
             if (rootAddress != null) {
@@ -51,7 +54,7 @@ public class SeriChat implements Serializable {
                 Cipher cipher = Cipher.getInstance("RSA");
                 cipher.init(Cipher.ENCRYPT_MODE, rootPublicKey);
                 byte[] cipheredPassword = cipher.doFinal(password.getBytes());
-                SeriEvent joinEvent = new SeriEvent(EventType.JOIN, cipheredPassword, nickName, keyPair.getPublic());
+                SeriEvent joinEvent = new SeriEvent(EventType.JOIN, groupName, cipheredPassword, nickName, keyPair.getPublic());
                 FutureResponse futureResponse = joiningPeerDHT.peer().sendDirect(rootAddress).object(joinEvent.serialize()).start().futureResponse();
                 futureResponse.awaitUninterruptibly();
                 byte[] response = (byte[]) futureResponse.responseMessage().buffer(0).object();
@@ -96,7 +99,7 @@ public class SeriChat implements Serializable {
         Number160 groupId = Number160.createHash(groupName);
         try {
             if (TomP2PExtras.findData(groupId, ownerPeerDHT) == null) {
-                ownerPeerDHT.put(groupId).data(new Data(groupName).protectEntry(keyPair)).sign().start().awaitUninterruptibly();
+                ownerPeerDHT.put(groupId).data(new Data(groupName)/*.protectEntry(keyPair)).sign(*/).start().awaitUninterruptibly();
                 FutureGet futureGet = ownerPeerDHT.get(groupId).start().awaitUninterruptibly();
                 PeerAddress rootAddress = (PeerAddress) futureGet.rawData().keySet().toArray()[0];
                 SeriEvent getPKEvent = new SeriEvent(EventType.GET_PK);
@@ -106,7 +109,7 @@ public class SeriChat implements Serializable {
 
                 PublicKey rootPublicKey = (PublicKey)response.responseMessage().buffer(0).object();
 
-                ownerPeerDHT.put(groupId).data(new Data(rootPublicKey).protectEntry(keyPair)).sign().start().awaitUninterruptibly();
+                ownerPeerDHT.put(groupId).data(new Data(rootPublicKey)/*.protectEntry(keyPair)).sign(*/).start().awaitUninterruptibly();
 
                 SecretKey grpAESKey = KeyGenerator.getInstance("AES").generateKey();
 
@@ -120,8 +123,13 @@ public class SeriChat implements Serializable {
 
                 ownerPeerDHT.peer().sendDirect(rootAddress).object(createEvent.serialize()).start().awaitUninterruptibly();
 
-                Group group = new Group(Role.OWNER,groupName, groupId, grpAESKey, rootAddress, password);
-                groups.put(groupName, group);
+                Group group = groups.get(groupName);
+                if (group == null) {
+                    groups.put(groupName, new Group(Role.OWNER, groupName, groupId, grpAESKey, rootAddress, password));
+                }
+                else {
+                    group.setRole(Role.OWNERandROOT);
+                }
 
                 LOG.info("Chat group " + groupName + " is now created");
             }
@@ -174,6 +182,7 @@ public class SeriChat implements Serializable {
 
     public Object handleEvent(SeriEvent event, PeerAddress sender) {
         Cipher cipher = null;
+        LOG.debug("handling Seri Event...");
         switch (event.getType()) {
             case CHAT:
                 return null;
@@ -213,11 +222,12 @@ public class SeriChat implements Serializable {
             case JOIN:
                 try {
                     Group groupToJoin = groups.get(event.getGroupName());
-                    if (groupToJoin != null && groupToJoin.getRole() == Role.ROOT) {
+                    if (groupToJoin != null && (groupToJoin.getRole() == Role.ROOT || groupToJoin.getRole() == Role.OWNERandROOT)) {
                         cipher = Cipher.getInstance("RSA");
                         cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
                         String password = new String(cipher.doFinal(event.getPassword()));
-                        if (groupToJoin.getPassword() == password) {
+                        LOG.debug("Handling join event: Group name=" + groupToJoin + " pass=" + password);
+                        if (groupToJoin.getPassword().equals(password)) {
                             cipher.init(Cipher.ENCRYPT_MODE, event.getPublicKey());
                             return cipher.doFinal(groupToJoin.getGrpAESKey().getEncoded());
                         }

@@ -27,8 +27,9 @@ public class SeriEvent implements Serializable {
         this.grpSecretKey = grpSecretKey;
     }
 
-    public SeriEvent(EventType type, byte[] password, String senderNickName, PublicKey publicKey) {
+    public SeriEvent(EventType type, String groupName, byte[] password, String senderNickName, PublicKey publicKey) {
         this.type = type;
+        this.groupName = groupName;
         this.password = password;
         this.senderNickName = senderNickName;
         this.publicKey = publicKey;

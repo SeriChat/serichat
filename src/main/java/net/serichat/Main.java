@@ -35,12 +35,12 @@ public class Main {
     static private Number160 peer1Owner;
     private static final Logger LOG = LoggerFactory.getLogger(Main.class);
 
-    public Main(int peerId) throws Exception {
+    public Main(int peerId, String nickName) throws Exception {
         KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
         gen.initialize(1024);
         keyPair = gen.generateKeyPair();
 
-        seriChat = new SeriChat("Bilal", keyPair);
+        seriChat = new SeriChat(nickName, keyPair);
 
         Bindings b = new Bindings().listenAny();
 
@@ -88,14 +88,14 @@ public class Main {
     }
 
     public static void main(String[] arg) throws NumberFormatException, Exception {
-        Main dns = new Main(Integer.parseInt(arg[0]));
+        Main dns = new Main(Integer.parseInt(arg[0]), arg[1]);
         if (arg.length == 3) {
             seriChat.createGroup("IHA", "123456", peerDHT);
             //PeerAddress adr = (PeerAddress)dns.get(arg[1]);
             //System.out.print(adr.toString());
         }
         if (arg.length == 2) {
-            //seriChat.join("IHA", "123456", peerDHT);
+            seriChat.join("IHA", "123456", peerDHT);
             //dns.store(arg[1], "Second");
             //System.out.println("Key: " + arg[1] + " is at the node with this ID: " + dns.get(arg[1]).toString());
             //Thread.sleep(4000);

@@ -18,11 +18,11 @@ public class Group {
     private SecretKey grpAESKey;
     private String password;
     private String groupKey;
-    private Peer rightChild;
-    private Peer leftChild;
     private Role role;
     private PeerAddress rootAddress;
     private PeerAddress ownerAddreess;
+    private PeerAddress rightChild;
+    private PeerAddress leftChild;
 
     public Group(Role role, String groupName, Number160 groupId, SecretKey grpAESKey, PeerAddress rootAddress , String password ) {
         this.role = role;
@@ -70,22 +70,6 @@ public class Group {
         this.groupId = groupId;
     }
 
-    public Peer getRightChild() {
-        return rightChild;
-    }
-
-    public void setRightChild(Peer rightChild) {
-        this.rightChild = rightChild;
-    }
-
-    public Peer getLeftChild() {
-        return leftChild;
-    }
-
-    public void setLeftChild(Peer leftChild) {
-        this.leftChild = leftChild;
-    }
-
     public String getGroupName() {
         return groupName;
     }
@@ -96,5 +80,21 @@ public class Group {
 
     public SecretKey getGrpAESKey() {
         return grpAESKey;
+    }
+
+    public PeerAddress getRightChild() {
+        return rightChild;
+    }
+
+    public void setRightChild(PeerAddress rightChild) {
+        this.rightChild = rightChild;
+    }
+
+    public PeerAddress getLeftChild() {
+        return leftChild;
+    }
+
+    public void setLeftChild(PeerAddress leftChild) {
+        this.leftChild = leftChild;
     }
 }
