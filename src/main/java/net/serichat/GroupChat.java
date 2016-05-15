@@ -14,7 +14,7 @@ public class GroupChat {
         rightChild
         leftChild
 
-    net.serichat.User
+    net.serichat.SeriChat
         join
         leave
         createGroup //// groupid

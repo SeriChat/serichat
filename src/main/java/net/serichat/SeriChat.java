@@ -1,100 +1,242 @@
-package net.serichat; /**
- * Created by khaledsaied on 20/04/16.
- */
-import java.io.IOException;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
+package net.serichat;
 
-import net.tomp2p.futures.FutureBootstrap;
-import net.tomp2p.futures.FutureDHT;
-import net.tomp2p.p2p.Peer;
-import net.tomp2p.p2p.PeerMaker;
+import com.sun.corba.se.impl.orbutil.closure.Future;
+import net.tomp2p.connection.PeerBean;
+import net.tomp2p.dht.FutureGet;
+import net.tomp2p.dht.PeerDHT;
+import net.tomp2p.futures.FutureResponse;
 import net.tomp2p.peers.Number160;
 import net.tomp2p.peers.PeerAddress;
-import net.tomp2p.rpc.ObjectDataReply;
 import net.tomp2p.storage.Data;
-import net.tomp2p.utils.Utils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class SeriChat {
+import javax.crypto.*;
+import javax.crypto.spec.SecretKeySpec;
+import java.io.IOException;
+import java.io.Serializable;
+import java.security.InvalidKeyException;
+import java.security.KeyPair;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.util.HashMap;
+import java.util.Map;
 
-    final private Peer peer;
+/**
+ * Created by khaledsaied on 27/04/16.
+ */
+public class SeriChat implements Serializable {
 
-    public SeriChat(int peerId) throws Exception {
-        peer = new PeerMaker(Number160.createHash(peerId)).setPorts(4000 + peerId).makeAndListen();
-        FutureBootstrap fb = peer.bootstrap().setBroadcast().setPorts(4001).start();
-        fb.awaitUninterruptibly();
-        if (fb.getBootstrapTo() != null) {
-            peer.discover().setPeerAddress(fb.getBootstrapTo().iterator().next()).start().awaitUninterruptibly();
-        }
+    private static final Logger LOG = LoggerFactory.getLogger(SeriChat.class);
+    private String nickName;
+    private Map<String,Group> groups;
+    private KeyPair keyPair;
 
-        peer.setObjectDataReply(new ObjectDataReply() {
 
-            public Object reply(final PeerAddress sender, final Object request) throws Exception {
-                //if(!peer.getPeerID().toString().equals(sender.getID().toString())) { // Workaround!!
-
-                    //System.out.println("ObjectData says Msg: " + request.toString() + ", from: " + sender.getID());
-                //}
-                return "world!";
+    public SeriChat(String nickName, KeyPair keyPair) {
+        this.nickName = nickName;
+        groups = new HashMap<String, Group>();
+        this.keyPair = keyPair;
+    }
+    //test
+    public void join(String groupName, String password, PeerDHT joiningPeerDHT) {
+        Number160 groupId = Number160.createHash(groupName);
+        try {
+            FutureGet futureGet = joiningPeerDHT.get(groupId).start();
+            futureGet.awaitUninterruptibly();
+            PeerAddress rootAddress = (PeerAddress) futureGet.rawData().keySet().toArray()[0];
+            PublicKey rootPublicKey = (PublicKey) futureGet.data().object();
+            if (rootAddress != null) {
+                LOG.debug("Root for " + groupName + "'s chat group: " + rootAddress.peerId() + " peerId");
+                Cipher cipher = Cipher.getInstance("RSA");
+                cipher.init(Cipher.ENCRYPT_MODE, rootPublicKey);
+                byte[] cipheredPassword = cipher.doFinal(password.getBytes());
+                SeriEvent joinEvent = new SeriEvent(EventType.JOIN, cipheredPassword, nickName, keyPair.getPublic());
+                FutureResponse futureResponse = joiningPeerDHT.peer().sendDirect(rootAddress).object(joinEvent.serialize()).start().futureResponse();
+                futureResponse.awaitUninterruptibly();
+                byte[] response = (byte[]) futureResponse.responseMessage().buffer(0).object();
+                if (response != null) {
+                    LOG.debug("Public key is received");
+                    cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
+                    byte[] grpSecretKeyBytes = cipher.doFinal(response);
+                    SecretKey grpSecretKey = new SecretKeySpec(grpSecretKeyBytes, 0, grpSecretKeyBytes.length, "AES");
+                    Group joinedGroup = new Group(Role.MEMBER, groupName, groupId, grpSecretKey, rootAddress, password);
+                    groups.put(groupName, joinedGroup);
+                    LOG.info("You are now member of " + groupName + " chat-group");
+                }
+                else {
+                    LOG.info("Failed to join the group!");
+                }
             }
-        });
+            else {
+                LOG.info("Group does not exist!");
+            }
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void leave() {
 
     }
 
-    public static void main(String[] arg) throws NumberFormatException, Exception {
-        SeriChat dns = new SeriChat(Integer.parseInt(arg[0]));
-        if (arg.length == 3) {
-            dns.store(arg[1], "First");
+    public void createGroup(String groupName, String password, PeerDHT ownerPeerDHT) {
+        Number160 groupId = Number160.createHash(groupName);
+        try {
+            if (TomP2PExtras.findData(groupId, ownerPeerDHT) == null) {
+                ownerPeerDHT.put(groupId).data(new Data(groupName).protectEntry(keyPair)).sign().start().awaitUninterruptibly();
+                FutureGet futureGet = ownerPeerDHT.get(groupId).start().awaitUninterruptibly();
+                PeerAddress rootAddress = (PeerAddress) futureGet.rawData().keySet().toArray()[0];
+                SeriEvent getPKEvent = new SeriEvent(EventType.GET_PK);
+
+                FutureResponse response = ownerPeerDHT.peer().sendDirect(rootAddress).object(getPKEvent.serialize()).start().futureResponse();
+                response.awaitUninterruptibly();
+
+                PublicKey rootPublicKey = (PublicKey)response.responseMessage().buffer(0).object();
+
+                ownerPeerDHT.put(groupId).data(new Data(rootPublicKey).protectEntry(keyPair)).sign().start().awaitUninterruptibly();
+
+                SecretKey grpAESKey = KeyGenerator.getInstance("AES").generateKey();
+
+                Cipher cipher = Cipher.getInstance("RSA");
+                cipher.init(Cipher.ENCRYPT_MODE, rootPublicKey);
+                byte[] cipheredGrpAESKey = cipher.doFinal(grpAESKey.getEncoded());
+                byte[] cipheredPassword = cipher.doFinal(password.getBytes());
+
+                SeriEvent createEvent = new SeriEvent(EventType.CREATE, groupName, nickName, cipheredPassword, cipheredGrpAESKey);
+                LOG.debug("createEvent length: " + createEvent.serialize().length + " bytes \n");
+
+                ownerPeerDHT.peer().sendDirect(rootAddress).object(createEvent.serialize()).start().awaitUninterruptibly();
+
+                Group group = new Group(Role.OWNER,groupName, groupId, grpAESKey, rootAddress, password);
+                groups.put(groupName, group);
+
+                LOG.info("Chat group " + groupName + " is now created");
+            }
+        else {
+                LOG.info("Group name allready exists!");
+            }
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
         }
-        if (arg.length == 2) {
-            //dns.store(arg[1], "Second");
-            System.out.println("Key: " + arg[1] + " is at the node with this ID: " + dns.get(arg[1]).toString());
-            //dns.peer.sendDirect((PeerAddress) dns.get(arg[1])).setObject("Hello").start();
+
+    }
+
+    public void sendMsg(String groupName, PeerDHT sendingPeerDHT, String msg) {
+
+        SeriEvent seriEvent = new SeriEvent(groupName, msg, nickName);
+        Group group = groups.get(groupName);
+        if(group.getRole() != Role.ROOT){
+            PeerAddress root = group.getRootAddress();
+
+            sendingPeerDHT.peer().sendDirect(root).object(seriEvent).start().awaitUninterruptibly();
+        }
+        else {
+
         }
     }
 
-    private Object get(String name) throws ClassNotFoundException, IOException {
-        FutureDHT futureDHT = peer.get(Number160.createHash(name)).start();
-        futureDHT.awaitUninterruptibly();
-        if (futureDHT.isSuccess()) {
-            //return futureDHT.getRawData().keySet().toArray()[0];
-            return futureDHT.getData().getObject();
-        }
-        return null;
+    public void stabilization() {
+
     }
 
-    private void store(String name, String data) throws IOException, NoSuchAlgorithmException {
-        Data dataObj = new Data(data);
-        KeyPairGenerator gen = KeyPairGenerator.getInstance("DSA");
-        KeyPair keyPair = gen.generateKeyPair();
+    public void forwardMsg() {
 
-        final Number160 peer2Owner = Utils.makeSHAHash( keyPair.getPublic().getEncoded()); // results in 0
-        FutureDHT futureDHT = peer.put(Number160.createHash(name)).setData(new Data(data))
-                .setProtectDomain().setDomainKey(peer2Owner).start();
+    }
+
+    public void changeRole() {
+
+    }
+
+    public Object handleEvent(SeriEvent event, PeerAddress sender) {
+        Cipher cipher = null;
+        switch (event.getType()) {
+            case CHAT:
+                return null;
+            case CREATE:
+                try {
+                    cipher = Cipher.getInstance("RSA");
+                    cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
+                    byte[] grpSecretKeyBytes = cipher.doFinal(event.getGrpSecretKey());
+                    SecretKey grpSecretKey = new SecretKeySpec(grpSecretKeyBytes, 0, grpSecretKeyBytes.length, "AES");
+                    String password = new String(cipher.doFinal(event.getPassword()));
+                    Group group = new Group(
+                            Role.ROOT,
+                            event.getGroupName(),
+                            Number160.createHash(event.getGroupName()),
+                            grpSecretKey,
+                            sender,
+                            event.getOwnerNickName(),
+                            password);
+                    groups.put(group.getGroupName(), group);
+                } catch (NoSuchAlgorithmException e) {
+                    e.printStackTrace();
+                } catch (NoSuchPaddingException e) {
+                    e.printStackTrace();
+                } catch (InvalidKeyException e) {
+                    e.printStackTrace();
+                } catch (BadPaddingException e) {
+                    e.printStackTrace();
+                } catch (IllegalBlockSizeException e) {
+                    e.printStackTrace();
+                }
+
+                return null;
+
+            case GET_PK:
+                return keyPair.getPublic();
+            case SEND_PK:
+            case JOIN:
+                try {
+                    Group groupToJoin = groups.get(event.getGroupName());
+                    if (groupToJoin != null && groupToJoin.getRole() == Role.ROOT) {
+                        cipher = Cipher.getInstance("RSA");
+                        cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
+                        String password = new String(cipher.doFinal(event.getPassword()));
+                        if (groupToJoin.getPassword() == password) {
+                            cipher.init(Cipher.ENCRYPT_MODE, event.getPublicKey());
+                            return cipher.doFinal(groupToJoin.getGrpAESKey().getEncoded());
+                        }
+                        return null;
+                    }
+                } catch (NoSuchAlgorithmException e) {
+                    e.printStackTrace();
+                } catch (NoSuchPaddingException e) {
+                    e.printStackTrace();
+                } catch (BadPaddingException e) {
+                    e.printStackTrace();
+                } catch (IllegalBlockSizeException e) {
+                    e.printStackTrace();
+                } catch (InvalidKeyException e) {
+                    e.printStackTrace();
+                }
+            case LEAVE:
+            default:
+                return null;
+        }
     }
 }
-/*
-public class MyStorageMemory extends StorageMemory {
-    public Collection<Number160> put(Number160 locationKey, Number160 domainKey, PublicKey publicKey,
-                                     Map<Number160, Data> contentMap, boolean putIfAbsent, boolean domainProtection)
-    {
-        if (true) {
-            //here we could get an int from the data and sum it up
-        } else {
-            super.put()
-            super.put(locationKey, domainKey, null, publicKey, putIfAbsent, domainProtection);
-        }
-    }
-}
-
-	private static void exampleSendOne(PeerDHT peer) {
-		RequestP2PConfiguration requestP2PConfiguration = new RequestP2PConfiguration(1, 10, 0);
-		FutureSend futureSend = peer.send(Number160.createHash("key")).object("hello")
-		        .requestP2PConfiguration(requestP2PConfiguration).start();
-		futureSend.awaitUninterruptibly();
-		for (Object object : futureSend.rawDirectData2().values()) {
-			System.err.println("got:" + object);
-		}
-	}
-
-*/
