@@ -47,9 +47,8 @@ public class Main {
         System.out.print(keyPair.getPublic().toString());
         peer = new PeerBuilder(Number160.createHash(peerId)).keyPair(keyPair).ports(4000 + peerId).bindings(b).start();
 
-        InetAddress masterAddr = Inet4Address.getByName("192.168.1.114");
+        InetAddress masterAddr = Inet4Address.getByName("localhost");
         int masterPort = 4001;
-        PeerAddress masterPA = new PeerAddress(Number160.ZERO, masterAddr, masterPort, masterPort, masterPort +1 );
 
         FutureDiscover futureDiscover = peer.discover().expectManualForwarding().inetAddress(masterAddr).ports(masterPort).start();
         futureDiscover.awaitUninterruptibly();
