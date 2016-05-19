@@ -5,6 +5,8 @@ import com.sun.xml.internal.bind.v2.runtime.unmarshaller.Receiver;
 import net.tomp2p.connection.PeerBean;
 import net.tomp2p.dht.FutureGet;
 import net.tomp2p.dht.PeerDHT;
+import net.tomp2p.futures.BaseFutureAdapter;
+import net.tomp2p.futures.FutureDirect;
 import net.tomp2p.futures.FutureResponse;
 import net.tomp2p.peers.Number160;
 import net.tomp2p.peers.PeerAddress;
@@ -41,7 +43,7 @@ public class SeriChat implements Serializable {
         this.keyPair = keyPair;
         this.direction = Direction.RGIHT;
     }
-    //TODO: What if the key is moved?
+    //TODO: What if the key is moved to a new node?
     public void join(String groupName, String password, PeerDHT joiningPeerDHT) {
         LOG.info("Joining: " + groupName);
         Number160 groupId = Number160.createHash(groupName);
@@ -237,15 +239,45 @@ public class SeriChat implements Serializable {
                             if(!groupToJoin.setChild(sender)) {
                                 SeriEvent forwardJoinEvent = new SeriEvent(EventType.FORWARD_JOIN, groupToJoin.getGroupName(), sender);
                                 if(direction == Direction.RGIHT) {
-                                    LOG.info("Forwarding peer(" + sender.peerId() + ") to the right");
-                                    receiverPeerDHT.peer().sendDirect(groupToJoin.getRightChild()).object(forwardJoinEvent.serialize())
-                                            .start().awaitUninterruptibly();
+                                    LOG.info("Forwarding peer(" + sender.peerId() + ") to the right child(" + groupToJoin.getRightChild().peerId() + ")");
+
+                                    class MyThread implements Runnable {
+
+                                        PeerDHT receiverPeerDHT;
+                                        Group groupToJoin;
+                                        SeriEvent forwardJoinEvent;
+
+                                        public MyThread(PeerDHT receiverPeerDHT, Group groupToJoin, SeriEvent forwardJoinEvent) {
+                                            this.receiverPeerDHT = receiverPeerDHT;
+                                            this.groupToJoin = groupToJoin;
+                                            this.forwardJoinEvent = forwardJoinEvent;
+                                        }
+
+                                        public void run() {
+                                            try {
+                                                Thread.sleep(10000);
+                                                FutureDirect futureDirect = receiverPeerDHT.peer().sendDirect(groupToJoin.getRightChild()).object(forwardJoinEvent.serialize())
+                                                        .start().awaitUninterruptibly();
+                                                if(!futureDirect.isSuccess()) {
+                                                    LOG.info("Failure!");
+                                                }
+                                            } catch (IOException e) {
+                                                e.printStackTrace();
+                                            } catch (InterruptedException e) {
+                                                e.printStackTrace();
+                                            }
+                                        }
+                                    }
+
+                                    Runnable r = new MyThread(receiverPeerDHT, groupToJoin, forwardJoinEvent);
+                                    new Thread(r).start();
+
                                     direction = Direction.LEFT;
                                 }
                                 else if (direction == Direction.LEFT){
-                                    LOG.info("Forwarding peer(" + sender.peerId() + ") to the left");
+                                    LOG.info("Forwarding peer(" + sender.peerId() + ") to the left child(" + groupToJoin.getLeftChild().peerId() + ")");
                                     receiverPeerDHT.peer().sendDirect(groupToJoin.getLeftChild()).object(forwardJoinEvent.serialize())
-                                            .start().awaitUninterruptibly();
+                                            .start();//.awaitUninterruptibly();
                                     direction = Direction.RGIHT;
                                 }
                             }
@@ -266,6 +298,7 @@ public class SeriChat implements Serializable {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+
             case FORWARD_JOIN:
                 Group groupToJoin = groups.get(event.getGroupName());
                 if(!groupToJoin.setChild(sender)) {
@@ -273,23 +306,30 @@ public class SeriChat implements Serializable {
                         if(direction == Direction.RGIHT) {
                             LOG.info("Forwarding peer(" + event.getJoinedPeer().peerId() + ") to the right");
                                 receiverPeerDHT.peer().sendDirect(groupToJoin.getRightChild()).object(event.serialize())
-                                        .start().awaitUninterruptibly();
+                                        .start();//.awaitUninterruptibly();
                             direction = Direction.LEFT;
                         }
                         else if (direction == Direction.LEFT){
                             LOG.info("Forwarding peer(" + event.getJoinedPeer().peerId() + ") to the left");
                             receiverPeerDHT.peer().sendDirect(groupToJoin.getLeftChild()).object(event.serialize())
-                                    .start().awaitUninterruptibly();
+                                    .start();//.awaitUninterruptibly();
                             direction = Direction.RGIHT;
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                 }
+                else {
+                    LOG.info("Peer (" + event.getJoinedPeer().peerId() + ") is now my child");
+                }
                 return null;
             case LEAVE:
             default:
                 return null;
         }
+    }
+
+    public Map<String, Group> getGroups() {
+        return groups;
     }
 }

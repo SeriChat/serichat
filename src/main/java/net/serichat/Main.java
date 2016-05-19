@@ -4,6 +4,7 @@ package net.serichat; /**
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -45,7 +46,15 @@ public class Main {
         Bindings b = new Bindings().listenAny();
 
         System.out.print(keyPair.getPublic().toString());
-        peer = new PeerBuilder(Number160.createHash(peerId)).keyPair(keyPair).ports(4000 + peerId).bindings(b).start();
+        ServerSocket s = new ServerSocket(0);
+        int port = 0;
+        if(peerId != 1) {
+            port = s.getLocalPort();
+        }
+        else {
+            port = 4001;
+        }
+        peer = new PeerBuilder(Number160.createHash(peerId)).keyPair(keyPair).ports(port).bindings(b).start();
 
         InetAddress masterAddr = Inet4Address.getByName("localhost");
         int masterPort = 4001;
@@ -63,38 +72,106 @@ public class Main {
                 StorageLayer.ProtectionEnable.ALL,
                 StorageLayer.ProtectionMode.MASTER_PUBLIC_KEY);
 
-        /*System.out.println("peer[0] knows: " + peer.peerBean().peerMap().all() + " unverified: "
-                + peer.peerBean().peerMap().allOverflow());
-        System.out.println("wait for maintenance ping");
-        Thread.sleep(2000);
-        System.out.println("peer[0] knows: " + peer.peerBean().peerMap().all() + " unverified: "
-                + peer.peerBean().peerMap().allOverflow());*/
-
         peer.objectDataReply(new ObjectDataReply() {
 
-            public Object reply(final PeerAddress sender, final Object request) throws Exception {
+            public Object reply(final PeerAddress sender, final Object request) {
+
+
+                /*System.out.println("peer[0] knows: " + peer.peerBean().peerMap().all() + " unverified: "
+                        + peer.peerBean().peerMap().allOverflow());
+                System.out.println("wait for maintenance ping");
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                System.out.println("peer[0] knows: " + peer.peerBean().peerMap().all() + " unverified: "
+                        + peer.peerBean().peerMap().allOverflow());*/
+
+                /*if(seriChat.getGroups().get("IHA") != null && seriChat.getGroups().get("IHA").getRightChild() != null) {
+                    FutureDirect futureDirect = peerDHT.peer().sendDirect(seriChat.getGroups().get("IHA").getRightChild()).object("Test")
+                            .start().awaitUninterruptibly();
+                    if (!futureDirect.isSuccess()) {
+                        LOG.info("Failure!");
+                    }
+                }*/
 
                 LOG.info("Replying...");
 
-                SeriEvent seriEvent = new SeriEvent((byte[])request);
+                try {
+                    SeriEvent seriEvent = new SeriEvent((byte[]) request);
+                    LOG.info("YAAAAY, it is a Seri-event from " + seriEvent.getGroupName());
+                    return seriChat.handleEvent(seriEvent, sender, peerDHT);
+                } catch (Exception ex) {
+                    LOG.info(request.toString());
+                    return null;
+                }
 
-                LOG.info("YAAAAY, it is an event from " + seriEvent.getGroupName());
-
-                return seriChat.handleEvent(seriEvent, sender, peerDHT);
             }
         });
 
+    }
+
+    static class Heartbeat implements Runnable {
+
+        PeerDHT peerDHT;
+        SeriChat seriChat;
+
+        public Heartbeat(PeerDHT peerDHT, SeriChat seriChat) {
+            this.peerDHT = peerDHT;
+            this.seriChat = seriChat;
+        }
+
+        public void run() {
+            while (true) {
+                try {
+                    Thread.sleep(2000);
+                    FutureDirect futureDirect = null;
+                    if(seriChat.getGroups().get("IHA").getRightChild() != null) {
+                        futureDirect = peerDHT.peer().sendDirect(seriChat.getGroups().get("IHA").getRightChild()).object("Test")
+                                .start().awaitUninterruptibly();
+                        if (!futureDirect.isSuccess()) {
+                            LOG.info("Failure!");
+                        }
+                    }
+                } catch (InterruptedException e) {
+                }
+            }
+        }
     }
 
     public static void main(String[] arg) throws NumberFormatException, Exception {
         Main dns = new Main(Integer.parseInt(arg[0]), arg[1]);
         if (arg.length == 3) {
             seriChat.createGroup("IHA", "123456", peerDHT);
+            InetAddress masterAddr = Inet4Address.getByName("localhost");
+            int masterPort = 4001;
+            while(true) {
+                Thread.sleep(2000);
+                FutureDiscover futureDiscover = peer.discover().expectManualForwarding().inetAddress(masterAddr).ports(masterPort).start();
+                futureDiscover.awaitUninterruptibly();
+                FutureBootstrap futureBootstrap = peer.bootstrap().inetAddress(masterAddr).ports(masterPort).start();
+                futureBootstrap.awaitUninterruptibly();
+                if(seriChat.getGroups().get("IHA") != null && seriChat.getGroups().get("IHA").getRightChild() != null) {
+                    FutureDirect futureDirect = peerDHT.peer().sendDirect(seriChat.getGroups().get("IHA").getRightChild()).object("Test")
+                            .start().awaitUninterruptibly();
+                    if (!futureDirect.isSuccess()) {
+                        LOG.info("Failure!");
+                    }
+                }
+
+            }
+            //Runnable r = new Heartbeat(peerDHT, seriChat);
+            //new Thread(r).start();
+
             //PeerAddress adr = (PeerAddress)dns.get(arg[1]);
             //System.out.print(adr.toString());
+            //dns.store(arg[1],arg[2]);
+
         }
         if (arg.length == 2) {
             seriChat.join("IHA", "123456", peerDHT);
+
             //dns.store(arg[1], "Second");
             //System.out.println("Key: " + arg[1] + " is at the node with this ID: " + dns.get(arg[1]).toString());
             //Thread.sleep(4000);
@@ -110,9 +187,9 @@ public class Main {
         futureGet.awaitUninterruptibly();
         //System.out.print(Number160.createHash(name));
         if (futureGet.isSuccess() && futureGet.data() != null) {
-            System.out.print(futureGet.data().object().toString() + " " + futureGet.data().toString() + "\n"
-            + futureGet.data().publicKey().toString());
-            return futureGet.rawData().keySet().toArray()[0];
+            //System.out.print(futureGet.data().object().toString() + " " + futureGet.data().toString() + "\n"
+            //+ futureGet.data().publicKey().toString());
+            return futureGet.data();
         }
         return null;
     }
@@ -120,7 +197,7 @@ public class Main {
     private void store(String name, String data) throws IOException, NoSuchAlgorithmException {
         System.out.print(Number160.createHash(name));
         FuturePut futurePut = peerDHT.put(Number160.createHash(name)).data(new Data(data)
-                .protectEntry(keyPair)).sign()
+                /*.protectEntry(keyPair)).sign(*/)
                 /*.setProtectDomain().setDomainKey(peer1Owner)*/.start().awaitUninterruptibly();
     }
 }
