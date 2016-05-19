@@ -14,7 +14,7 @@ public class SeriEvent implements Serializable {
     private EventType type;
     private byte[] password;
     private String senderNickName;
-    private String chatMsg;
+    private byte[] chatMsg;
     private String groupName;
     private String ownerNickName;
     private byte[] grpSecretKey;
@@ -38,7 +38,7 @@ public class SeriEvent implements Serializable {
         this.publicKey = publicKey;
     }
 
-    public SeriEvent(String groupName, String chatMsg, String senderNickName) {
+    public SeriEvent(EventType type, String groupName, byte[] chatMsg, String senderNickName) {
         this.groupName = groupName;
         this.chatMsg = chatMsg;
         this.senderNickName = senderNickName;
@@ -83,7 +83,7 @@ public class SeriEvent implements Serializable {
         return senderNickName;
     }
 
-    public String getChatMsg() {
+    public byte[] getChatMsg() {
         return chatMsg;
     }
 

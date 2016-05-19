@@ -7,6 +7,7 @@ import net.tomp2p.dht.FutureGet;
 import net.tomp2p.dht.PeerDHT;
 import net.tomp2p.futures.BaseFutureAdapter;
 import net.tomp2p.futures.FutureDirect;
+import net.tomp2p.futures.FuturePeerConnection;
 import net.tomp2p.futures.FutureResponse;
 import net.tomp2p.peers.Number160;
 import net.tomp2p.peers.PeerAddress;
@@ -43,7 +44,7 @@ public class SeriChat implements Serializable {
         this.keyPair = keyPair;
         this.direction = Direction.RGIHT;
     }
-    //TODO: What if the key is moved to a new node?
+
     public void join(String groupName, String password, PeerDHT joiningPeerDHT) {
         LOG.info("Joining: " + groupName);
         Number160 groupId = Number160.createHash(groupName);
@@ -51,23 +52,24 @@ public class SeriChat implements Serializable {
             FutureGet futureGet = joiningPeerDHT.get(groupId).start();
             futureGet.awaitUninterruptibly();
             LOG.info("joiningPeerDHT got: " + futureGet.data());
-            PeerAddress rootAddress = (PeerAddress) futureGet.rawData().keySet().toArray()[0];
-            PublicKey rootPublicKey = (PublicKey) futureGet.data().object();
-            if (rootAddress != null) {
-                LOG.info("Root for " + groupName + "'s chat group: " + rootAddress.peerId() + " peerId");
+            PeerAddress groupKeyHolderAddr = (PeerAddress) futureGet.rawData().keySet().toArray()[0];
+            GroupKey groupKey = (GroupKey) futureGet.data().object(); //new GroupKey(futureGet.data().toBytes());
+            if (groupKeyHolderAddr != null) {
+                LOG.info("Owner for " + groupName + "'s chat group has this addr: " + groupKey.getOwnerAddress().peerSocketAddress());
                 Cipher cipher = Cipher.getInstance("RSA");
-                cipher.init(Cipher.ENCRYPT_MODE, rootPublicKey);
+                cipher.init(Cipher.ENCRYPT_MODE, groupKey.getOwnerPublicKey());
                 byte[] cipheredPassword = cipher.doFinal(password.getBytes());
                 SeriEvent joinEvent = new SeriEvent(EventType.JOIN, groupName, cipheredPassword, nickName, keyPair.getPublic());
-                FutureResponse futureResponse = joiningPeerDHT.peer().sendDirect(rootAddress).object(joinEvent.serialize()).start().futureResponse();
+                FuturePeerConnection pcOwner = joiningPeerDHT.peer().createPeerConnection(groupKey.getOwnerAddress());
+                FutureResponse futureResponse = joiningPeerDHT.peer().sendDirect(pcOwner).object(joinEvent.serialize()).start().futureResponse();
                 futureResponse.awaitUninterruptibly();
-                byte[] response = (byte[]) futureResponse.responseMessage().buffer(0).object();
-                if (response != null) {
-                    LOG.info("Public key is received");
+                if (futureResponse.isSuccess()) {
+                    byte[] response = (byte[]) futureResponse.responseMessage().buffer(0).object();
+                    LOG.info("grpSecretKey is received");
                     cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
                     byte[] grpSecretKeyBytes = cipher.doFinal(response);
                     SecretKey grpSecretKey = new SecretKeySpec(grpSecretKeyBytes, 0, grpSecretKeyBytes.length, "AES");
-                    Group joinedGroup = new Group(Role.MEMBER, groupName, groupId, grpSecretKey, rootAddress, password);
+                    Group joinedGroup = new Group(Role.MEMBER, groupName, groupId, grpSecretKey, groupKeyHolderAddr, password);
                     groups.put(groupName, joinedGroup);
                     LOG.info("You are now member of " + groupName + " chat-group");
                 }
@@ -95,45 +97,14 @@ public class SeriChat implements Serializable {
         }
     }
 
-    public void leave() {
-
-    }
-
     public void createGroup(String groupName, String password, PeerDHT ownerPeerDHT) {
         Number160 groupId = Number160.createHash(groupName);
         try {
             if (TomP2PExtras.findData(groupId, ownerPeerDHT) == null) {
-                ownerPeerDHT.put(groupId).data(new Data(groupName)/*.protectEntry(keyPair)).sign(*/).start().awaitUninterruptibly();
-                FutureGet futureGet = ownerPeerDHT.get(groupId).start().awaitUninterruptibly();
-                PeerAddress rootAddress = (PeerAddress) futureGet.rawData().keySet().toArray()[0];
-                SeriEvent getPKEvent = new SeriEvent(EventType.GET_PK);
-
-                FutureResponse response = ownerPeerDHT.peer().sendDirect(rootAddress).object(getPKEvent.serialize()).start().futureResponse();
-                response.awaitUninterruptibly();
-
-                PublicKey rootPublicKey = (PublicKey)response.responseMessage().buffer(0).object();
-
-                ownerPeerDHT.put(groupId).data(new Data(rootPublicKey)/*.protectEntry(keyPair)).sign(*/).start().awaitUninterruptibly();
+                ownerPeerDHT.put(groupId).data( new Data(new GroupKey(ownerPeerDHT.peerAddress(), keyPair.getPublic()))/*.protectEntry(keyPair)).sign(*/).start().awaitUninterruptibly();
 
                 SecretKey grpAESKey = KeyGenerator.getInstance("AES").generateKey();
-
-                Cipher cipher = Cipher.getInstance("RSA");
-                cipher.init(Cipher.ENCRYPT_MODE, rootPublicKey);
-                byte[] cipheredGrpAESKey = cipher.doFinal(grpAESKey.getEncoded());
-                byte[] cipheredPassword = cipher.doFinal(password.getBytes());
-
-                SeriEvent createEvent = new SeriEvent(EventType.CREATE, groupName, nickName, cipheredPassword, cipheredGrpAESKey);
-                LOG.info("createEvent length: " + createEvent.serialize().length + " bytes \n");
-
-                ownerPeerDHT.peer().sendDirect(rootAddress).object(createEvent.serialize()).start().awaitUninterruptibly();
-
-                Group group = groups.get(groupName);
-                if (group == null) {
-                    groups.put(groupName, new Group(Role.OWNER, groupName, groupId, grpAESKey, rootAddress, password));
-                }
-                else {
-                    group.setRole(Role.OWNERandROOT);
-                }
+                groups.put(groupName, new Group(Role.OWNER, groupName, groupId, grpAESKey, password));
 
                 LOG.info("Chat group " + groupName + " is now created");
             }
@@ -146,26 +117,33 @@ public class SeriChat implements Serializable {
             e.printStackTrace();
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
-        } catch (NoSuchPaddingException e) {
-            e.printStackTrace();
-        } catch (InvalidKeyException e) {
-            e.printStackTrace();
-        } catch (BadPaddingException e) {
-            e.printStackTrace();
-        } catch (IllegalBlockSizeException e) {
-            e.printStackTrace();
         }
 
     }
 
     public void sendMsg(String groupName, PeerDHT sendingPeerDHT, String msg) {
 
-        SeriEvent seriEvent = new SeriEvent(groupName, msg, nickName);
         Group group = groups.get(groupName);
-        if(group.getRole() != Role.ROOT){
-            PeerAddress root = group.getRootAddress();
+        if(group != null){
+            try {
+                Cipher cipher = Cipher.getInstance("AES");
+                cipher.init(Cipher.ENCRYPT_MODE, group.getGrpAESKey());
+                byte[] msgBytes = cipher.doFinal(msg.getBytes());
+                SeriEvent seriEvent = new SeriEvent(EventType.FORWARD_MESSAGE, groupName, msgBytes, nickName);
+                PeerAddress root = group.getRootAddress();
+                sendingPeerDHT.peer().sendDirect(root).object(seriEvent).start().awaitUninterruptibly();
 
-            sendingPeerDHT.peer().sendDirect(root).object(seriEvent).start().awaitUninterruptibly();
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            } catch (NoSuchPaddingException e) {
+                e.printStackTrace();
+            } catch (InvalidKeyException e) {
+                e.printStackTrace();
+            } catch (BadPaddingException e) {
+                e.printStackTrace();
+            } catch (IllegalBlockSizeException e) {
+                e.printStackTrace();
+            }
         }
         else {
 
@@ -176,112 +154,40 @@ public class SeriChat implements Serializable {
 
     }
 
-    public void forwardMsg() {
-
-    }
-
-    public void changeRole() {
+    public void leave() {
 
     }
 
     public Object handleEvent(SeriEvent event, PeerAddress sender, PeerDHT receiverPeerDHT) {
         Cipher cipher = null;
+        Group group = groups.get(event.getGroupName());
         LOG.info("handling Seri Event...");
         switch (event.getType()) {
-            case CHAT:
-                return null;
-            case CREATE:
-                try {
-                    cipher = Cipher.getInstance("RSA");
-                    cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
-                    byte[] grpSecretKeyBytes = cipher.doFinal(event.getGrpSecretKey());
-                    SecretKey grpSecretKey = new SecretKeySpec(grpSecretKeyBytes, 0, grpSecretKeyBytes.length, "AES");
-                    String password = new String(cipher.doFinal(event.getPassword()));
-                    Group group = new Group(
-                            Role.ROOT,
-                            event.getGroupName(),
-                            Number160.createHash(event.getGroupName()),
-                            grpSecretKey,
-                            sender,
-                            event.getOwnerNickName(),
-                            password);
-                    groups.put(group.getGroupName(), group);
-                    if(sender.peerId() != receiverPeerDHT.peer().peerID()) {
-                        group.setRightChild(sender);
-                    }
-                } catch (NoSuchAlgorithmException e) {
-                    e.printStackTrace();
-                } catch (NoSuchPaddingException e) {
-                    e.printStackTrace();
-                } catch (InvalidKeyException e) {
-                    e.printStackTrace();
-                } catch (BadPaddingException e) {
-                    e.printStackTrace();
-                } catch (IllegalBlockSizeException e) {
-                    e.printStackTrace();
-                }
-
-                return null;
-
-            case GET_PK:
-                return keyPair.getPublic();
-            case SEND_PK:
             case JOIN:
                 try {
-                    Group groupToJoin = groups.get(event.getGroupName());
-                    if (groupToJoin != null && (groupToJoin.getRole() == Role.ROOT || groupToJoin.getRole() == Role.OWNERandROOT)) {
+                    if (group != null && (group.getRole() == Role.OWNER)) {
                         cipher = Cipher.getInstance("RSA");
                         cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
                         String password = new String(cipher.doFinal(event.getPassword()));
-                        LOG.info("Handling join event: Group name=" + groupToJoin.getGroupName() + " pass=" + password);
-                        if (groupToJoin.getPassword().equals(password)) {
+                        LOG.info("Handling join event: Group name=" + group.getGroupName() + " pass=" + password);
+                        if (group.getPassword().equals(password)) {
                             cipher.init(Cipher.ENCRYPT_MODE, event.getPublicKey());
-                            if(!groupToJoin.setChild(sender)) {
-                                SeriEvent forwardJoinEvent = new SeriEvent(EventType.FORWARD_JOIN, groupToJoin.getGroupName(), sender);
+                            if(!group.setChild(sender)) {
+                                SeriEvent forwardJoinEvent = new SeriEvent(EventType.FORWARD_JOIN, group.getGroupName(), sender);
                                 if(direction == Direction.RGIHT) {
-                                    LOG.info("Forwarding peer(" + sender.peerId() + ") to the right child(" + groupToJoin.getRightChild().peerId() + ")");
-
-                                    class MyThread implements Runnable {
-
-                                        PeerDHT receiverPeerDHT;
-                                        Group groupToJoin;
-                                        SeriEvent forwardJoinEvent;
-
-                                        public MyThread(PeerDHT receiverPeerDHT, Group groupToJoin, SeriEvent forwardJoinEvent) {
-                                            this.receiverPeerDHT = receiverPeerDHT;
-                                            this.groupToJoin = groupToJoin;
-                                            this.forwardJoinEvent = forwardJoinEvent;
-                                        }
-
-                                        public void run() {
-                                            try {
-                                                Thread.sleep(10000);
-                                                FutureDirect futureDirect = receiverPeerDHT.peer().sendDirect(groupToJoin.getRightChild()).object(forwardJoinEvent.serialize())
-                                                        .start().awaitUninterruptibly();
-                                                if(!futureDirect.isSuccess()) {
-                                                    LOG.info("Failure!");
-                                                }
-                                            } catch (IOException e) {
-                                                e.printStackTrace();
-                                            } catch (InterruptedException e) {
-                                                e.printStackTrace();
-                                            }
-                                        }
-                                    }
-
-                                    Runnable r = new MyThread(receiverPeerDHT, groupToJoin, forwardJoinEvent);
-                                    new Thread(r).start();
-
+                                    LOG.info("Forwarding peer(" + sender.peerId() + ") to the left child(" + group.getRightChild().peerId() + ")");
+                                    receiverPeerDHT.peer().sendDirect(group.getRightChild()).object(forwardJoinEvent.serialize())
+                                            .start();//.awaitUninterruptibly();
                                     direction = Direction.LEFT;
                                 }
                                 else if (direction == Direction.LEFT){
-                                    LOG.info("Forwarding peer(" + sender.peerId() + ") to the left child(" + groupToJoin.getLeftChild().peerId() + ")");
-                                    receiverPeerDHT.peer().sendDirect(groupToJoin.getLeftChild()).object(forwardJoinEvent.serialize())
+                                    LOG.info("Forwarding peer(" + sender.peerId() + ") to the left child(" + group.getLeftChild().peerId() + ")");
+                                    receiverPeerDHT.peer().sendDirect(group.getLeftChild()).object(forwardJoinEvent.serialize())
                                             .start();//.awaitUninterruptibly();
                                     direction = Direction.RGIHT;
                                 }
                             }
-                            return cipher.doFinal(groupToJoin.getGrpAESKey().getEncoded());
+                            return cipher.doFinal(group.getGrpAESKey().getEncoded());
                         }
                         return null;
                     }
@@ -300,18 +206,17 @@ public class SeriChat implements Serializable {
                 }
 
             case FORWARD_JOIN:
-                Group groupToJoin = groups.get(event.getGroupName());
-                if(!groupToJoin.setChild(sender)) {
+                if(!group.setChild(sender)) {
                     try {
                         if(direction == Direction.RGIHT) {
                             LOG.info("Forwarding peer(" + event.getJoinedPeer().peerId() + ") to the right");
-                                receiverPeerDHT.peer().sendDirect(groupToJoin.getRightChild()).object(event.serialize())
+                                receiverPeerDHT.peer().sendDirect(group.getRightChild()).object(event.serialize())
                                         .start();//.awaitUninterruptibly();
                             direction = Direction.LEFT;
                         }
                         else if (direction == Direction.LEFT){
                             LOG.info("Forwarding peer(" + event.getJoinedPeer().peerId() + ") to the left");
-                            receiverPeerDHT.peer().sendDirect(groupToJoin.getLeftChild()).object(event.serialize())
+                            receiverPeerDHT.peer().sendDirect(group.getLeftChild()).object(event.serialize())
                                     .start();//.awaitUninterruptibly();
                             direction = Direction.RGIHT;
                         }
@@ -323,7 +228,39 @@ public class SeriChat implements Serializable {
                     LOG.info("Peer (" + event.getJoinedPeer().peerId() + ") is now my child");
                 }
                 return null;
-            case LEAVE:
+
+            case FORWARD_MESSAGE:
+                if(group != null) {
+                    byte[] enccryptedMsg = event.getChatMsg();
+                    try {
+                        cipher = Cipher.getInstance("AES");
+                        cipher.init(Cipher.DECRYPT_MODE, group.getGrpAESKey());
+
+                        String theMsg = new String(cipher.doFinal(enccryptedMsg));
+                        LOG.info(event.getSenderNickName() + ": " + theMsg);
+
+                        if(group.getRightChild() != null) {
+                            receiverPeerDHT.peer().sendDirect(group.getRightChild()).object(event).start();//.awaitUninterruptibly();
+                        }
+                        if(group.getLeftChild() != null) {
+                            receiverPeerDHT.peer().sendDirect(group.getLeftChild()).object(event).start();//.awaitUninterruptibly();
+                        }
+
+                        return null;
+
+                    } catch (NoSuchAlgorithmException e) {
+                        e.printStackTrace();
+                    } catch (NoSuchPaddingException e) {
+                        e.printStackTrace();
+                    } catch (BadPaddingException e) {
+                        e.printStackTrace();
+                    } catch (IllegalBlockSizeException e) {
+                        e.printStackTrace();
+                    } catch (InvalidKeyException e) {
+                        e.printStackTrace();
+                    }
+                }
+
             default:
                 return null;
         }

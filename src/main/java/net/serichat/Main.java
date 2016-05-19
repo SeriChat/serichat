@@ -9,13 +9,16 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import com.sun.corba.se.impl.orbutil.closure.Future;
-import net.tomp2p.connection.Bindings;
+import io.netty.channel.ChannelHandler;
+import io.netty.util.concurrent.EventExecutorGroup;
+import net.tomp2p.connection.*;
 import net.tomp2p.dht.*;
-import net.tomp2p.futures.FutureBootstrap;
-import net.tomp2p.futures.FutureDirect;
-import net.tomp2p.futures.FutureDiscover;
+import net.tomp2p.futures.*;
+import net.tomp2p.message.CountConnectionOutboundHandler;
 import net.tomp2p.p2p.Peer;
 import net.tomp2p.p2p.PeerBuilder;
 import net.tomp2p.p2p.builder.SendDirectBuilder;
@@ -23,6 +26,7 @@ import net.tomp2p.peers.Number160;
 import net.tomp2p.peers.PeerAddress;
 import net.tomp2p.rpc.ObjectDataReply;
 import net.tomp2p.storage.Data;
+import net.tomp2p.utils.Pair;
 import net.tomp2p.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +39,8 @@ public class Main {
     static private KeyPair keyPair;
     static private Number160 peer1Owner;
     private static final Logger LOG = LoggerFactory.getLogger(Main.class);
+    private static final CountConnectionOutboundHandler ccohTCP = new CountConnectionOutboundHandler();
+    private static final CountConnectionOutboundHandler ccohUDP = new CountConnectionOutboundHandler();
 
     public Main(int peerId, String nickName) throws Exception {
         KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
@@ -43,21 +49,21 @@ public class Main {
 
         seriChat = new SeriChat(nickName, keyPair);
 
-        Bindings b = new Bindings().listenAny();
+        Bindings b = new Bindings().addAddress(InetAddress.getByName("localhost"));
 
         System.out.print(keyPair.getPublic().toString());
         ServerSocket s = new ServerSocket(0);
         int port = 0;
-        if(peerId != 1) {
+        if (peerId != 1) {
             port = s.getLocalPort();
+
+        } else {
+            port = 46459;
         }
-        else {
-            port = 4001;
-        }
-        peer = new PeerBuilder(Number160.createHash(peerId)).keyPair(keyPair).ports(port).bindings(b).start();
+        peer = new PeerBuilder(Number160.createHash(peerId))/*.keyPair(keyPair)*/.ports(port).bindings(b).start();
 
         InetAddress masterAddr = Inet4Address.getByName("localhost");
-        int masterPort = 4001;
+        int masterPort = 46459;
 
         FutureDiscover futureDiscover = peer.discover().expectManualForwarding().inetAddress(masterAddr).ports(masterPort).start();
         futureDiscover.awaitUninterruptibly();
@@ -72,29 +78,12 @@ public class Main {
                 StorageLayer.ProtectionEnable.ALL,
                 StorageLayer.ProtectionMode.MASTER_PUBLIC_KEY);
 
+        FutureChannelCreator fcc = peer.connectionBean().reservation().create(1, 1);
+        fcc.awaitUninterruptibly();
+
         peer.objectDataReply(new ObjectDataReply() {
 
             public Object reply(final PeerAddress sender, final Object request) {
-
-
-                /*System.out.println("peer[0] knows: " + peer.peerBean().peerMap().all() + " unverified: "
-                        + peer.peerBean().peerMap().allOverflow());
-                System.out.println("wait for maintenance ping");
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                System.out.println("peer[0] knows: " + peer.peerBean().peerMap().all() + " unverified: "
-                        + peer.peerBean().peerMap().allOverflow());*/
-
-                /*if(seriChat.getGroups().get("IHA") != null && seriChat.getGroups().get("IHA").getRightChild() != null) {
-                    FutureDirect futureDirect = peerDHT.peer().sendDirect(seriChat.getGroups().get("IHA").getRightChild()).object("Test")
-                            .start().awaitUninterruptibly();
-                    if (!futureDirect.isSuccess()) {
-                        LOG.info("Failure!");
-                    }
-                }*/
 
                 LOG.info("Replying...");
 
@@ -112,117 +101,16 @@ public class Main {
 
     }
 
-    static class Heartbeat implements Runnable {
-
-        PeerDHT peerDHT;
-        SeriChat seriChat;
-
-        public Heartbeat(PeerDHT peerDHT, SeriChat seriChat) {
-            this.peerDHT = peerDHT;
-            this.seriChat = seriChat;
-        }
-
-        public void run() {
-            while (true) {
-                try {
-                    Thread.sleep(2000);
-                    FutureDirect futureDirect = null;
-                    if(seriChat.getGroups().get("IHA").getRightChild() != null) {
-                        futureDirect = peerDHT.peer().sendDirect(seriChat.getGroups().get("IHA").getRightChild()).object("Test")
-                                .start().awaitUninterruptibly();
-                        if (!futureDirect.isSuccess()) {
-                            LOG.info("Failure!");
-                        }
-                    }
-                } catch (InterruptedException e) {
-                }
-            }
-        }
-    }
-
     public static void main(String[] arg) throws NumberFormatException, Exception {
         Main dns = new Main(Integer.parseInt(arg[0]), arg[1]);
+        if (arg.length == 4) {
+
+        }
         if (arg.length == 3) {
             seriChat.createGroup("IHA", "123456", peerDHT);
-            InetAddress masterAddr = Inet4Address.getByName("localhost");
-            int masterPort = 4001;
-            while(true) {
-                Thread.sleep(2000);
-                FutureDiscover futureDiscover = peer.discover().expectManualForwarding().inetAddress(masterAddr).ports(masterPort).start();
-                futureDiscover.awaitUninterruptibly();
-                FutureBootstrap futureBootstrap = peer.bootstrap().inetAddress(masterAddr).ports(masterPort).start();
-                futureBootstrap.awaitUninterruptibly();
-                if(seriChat.getGroups().get("IHA") != null && seriChat.getGroups().get("IHA").getRightChild() != null) {
-                    FutureDirect futureDirect = peerDHT.peer().sendDirect(seriChat.getGroups().get("IHA").getRightChild()).object("Test")
-                            .start().awaitUninterruptibly();
-                    if (!futureDirect.isSuccess()) {
-                        LOG.info("Failure!");
-                    }
-                }
-
-            }
-            //Runnable r = new Heartbeat(peerDHT, seriChat);
-            //new Thread(r).start();
-
-            //PeerAddress adr = (PeerAddress)dns.get(arg[1]);
-            //System.out.print(adr.toString());
-            //dns.store(arg[1],arg[2]);
-
         }
         if (arg.length == 2) {
             seriChat.join("IHA", "123456", peerDHT);
-
-            //dns.store(arg[1], "Second");
-            //System.out.println("Key: " + arg[1] + " is at the node with this ID: " + dns.get(arg[1]).toString());
-            //Thread.sleep(4000);
-            //System.out.println("Key: " + arg[1] + " is at the node with this ID: " + dns.get(arg[1]).toString());
-            //FutureDirect direct = dns.peerDHT.peer().sendDirect((PeerAddress)dns.get(arg[1])).object(new SeriEvent("Test","").serialize()).start();
-            //direct.awaitUninterruptibly();
-            //System.out.print( ((PublicKey)direct.futureResponse().responseMessage().buffer(0).object()).toString() );
-        }
-    }
-
-    private Object get(String name) throws ClassNotFoundException, IOException {
-        FutureGet futureGet = peerDHT.get(Number160.createHash(name)).start();
-        futureGet.awaitUninterruptibly();
-        //System.out.print(Number160.createHash(name));
-        if (futureGet.isSuccess() && futureGet.data() != null) {
-            //System.out.print(futureGet.data().object().toString() + " " + futureGet.data().toString() + "\n"
-            //+ futureGet.data().publicKey().toString());
-            return futureGet.data();
-        }
-        return null;
-    }
-
-    private void store(String name, String data) throws IOException, NoSuchAlgorithmException {
-        System.out.print(Number160.createHash(name));
-        FuturePut futurePut = peerDHT.put(Number160.createHash(name)).data(new Data(data)
-                /*.protectEntry(keyPair)).sign(*/)
-                /*.setProtectDomain().setDomainKey(peer1Owner)*/.start().awaitUninterruptibly();
-    }
-}
-/*
-public class MyStorageMemory extends StorageMemory {
-    public Collection<Number160> put(Number160 locationKey, Number160 domainKey, PublicKey publicKey,
-                                     Map<Number160, Data> contentMap, boolean putIfAbsent, boolean domainProtection)
-    {
-        if (true) {
-            //here we could get an int from the data and sum it up
-        } else {
-            super.put()
-            super.put(locationKey, domainKey, null, publicKey, putIfAbsent, domainProtection);
         }
     }
 }
-
-	private static void exampleSendOne(PeerDHT peer) {
-		RequestP2PConfiguration requestP2PConfiguration = new RequestP2PConfiguration(1, 10, 0);
-		FutureSend futureSend = peer.send(Number160.createHash("key")).object("hello")
-		        .requestP2PConfiguration(requestP2PConfiguration).start();
-		futureSend.awaitUninterruptibly();
-		for (Object object : futureSend.rawDirectData2().values()) {
-			System.err.println("got:" + object);
-		}
-	}
-
-*/

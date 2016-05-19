@@ -24,7 +24,7 @@ public class Group {
     private PeerAddress rightChild;
     private PeerAddress leftChild;
 
-    public Group(Role role, String groupName, Number160 groupId, SecretKey grpAESKey, PeerAddress rootAddress , String password ) {
+    public Group(Role role, String groupName, Number160 groupId, SecretKey grpAESKey, String password ) {
         this.role = role;
         this.groupName = groupName;
         this.groupId = groupId;
@@ -33,7 +33,7 @@ public class Group {
         this.password = password;
     }
 
-    public Group(Role role, String groupName, Number160 groupId, SecretKey grpAESKey, PeerAddress ownerAddreess, String ownerNickName, String password ) {
+    public Group(Role role, String groupName, Number160 groupId, SecretKey grpAESKey, PeerAddress ownerAddreess, String password ) {
         this.role = role;
         this.groupName = groupName;
         this.groupId = groupId;
