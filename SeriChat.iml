@@ -11,6 +11,6 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="hamcrest-core-1.1" level="project" />
+    <orderEntry type="library" name="gcm-server-1.0.2" level="project" />
   </component>
 </module>
