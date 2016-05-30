@@ -1,0 +1,25 @@
+
+  _____           _  _____ _           _   
+ / ____|         (_)/ ____| |         | |  
+| (___   ___ _ __ _| |    | |__   __ _| |_ 
+ \___ \ / _ \ '__| | |    | '_ \ / _` | __|
+ ____) |  __/ |  | | |____| | | | (_| | |_ 
+|_____/ \___|_|  |_|\_____|_| |_|\__,_|\__|
+   
+
+To be able to run these you just have to run this JAR-file through the terminal with the mentioned commands (it is tested on Linux and Mac OSX).
+For each step you have to open a new terminal window.
+
+
+1- Create the bootstrapping node 
+java -jar SeriChat.jar
+
+
+2- Create a group by adding: groupowners name, -c (for create) , name of group, and password
+java -jar SeriChat.jar Niels -c AU 123456
+
+3- To join the group: write a name for the new member and replace -c with -j (for join) 
+java -jar SeriChat.jar Bilal -j AU 123456
+
+
+Step 2 and step 3 can be repeated with new names for both group owners/ group members and new groups.

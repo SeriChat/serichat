@@ -12,6 +12,9 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="gcm-server-1.0.2" level="project" />
+<<<<<<< HEAD
     <orderEntry type="library" name="Maven: net.tomp2p:TomP2P:4" level="project" />
+=======
+>>>>>>> d044c332cae5a7910a1edd29de4c554a719f2649
   </component>
 </module>
