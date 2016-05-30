@@ -33,13 +33,14 @@ public class Group {
         this.password = password;
     }
 
-    public Group(Role role, String groupName, Number160 groupId, SecretKey grpAESKey, PeerAddress ownerAddreess, String password ) {
+    public Group(Role role, String groupName, Number160 groupId, SecretKey grpAESKey, PeerAddress ownerAddreess, String password, PeerAddress rootAddress ) {
         this.role = role;
         this.groupName = groupName;
         this.groupId = groupId;
         this.grpAESKey = grpAESKey;
         this.ownerAddreess = ownerAddreess;
         this.password = password;
+        this.rootAddress = rootAddress;
     }
 
     public Group () {

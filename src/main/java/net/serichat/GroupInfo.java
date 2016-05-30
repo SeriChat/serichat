@@ -8,20 +8,20 @@ import java.security.PublicKey;
 /**
  * Created by bilalkais on 5/19/16.
  */
-public class GroupKey implements Serializable {
+public class GroupInfo implements Serializable {
     public PeerAddress ownerAddress;
     public PublicKey ownerPublicKey;
 
-    public GroupKey(PeerAddress ownerAddress, PublicKey ownerPublicKey) {
+    public GroupInfo(PeerAddress ownerAddress, PublicKey ownerPublicKey) {
         this.ownerAddress = ownerAddress;
         this.ownerPublicKey = ownerPublicKey;
     }
 
-    public GroupKey(byte[] serializedGroupKey) {
+    public GroupInfo(byte[] serializedGroupKey) {
         try {
-            GroupKey groupKey = (GroupKey)(deserialize(serializedGroupKey));
-            this.ownerAddress = groupKey.getOwnerAddress();
-            this.ownerPublicKey = groupKey.getOwnerPublicKey();
+            GroupInfo groupInfo = (GroupInfo)(deserialize(serializedGroupKey));
+            this.ownerAddress = groupInfo.getOwnerAddress();
+            this.ownerPublicKey = groupInfo.getOwnerPublicKey();
         } catch (IOException e) {
             e.printStackTrace();
         } catch (ClassNotFoundException e) {
