@@ -8,6 +8,12 @@
     <artifactId>serichat</artifactId>
     <version>1.0-SNAPSHOT</version>
 
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <java.version>1.8</java.version>
+        <start-class>net.serichat.Main</start-class>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>net.tomp2p</groupId>

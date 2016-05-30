@@ -1,0 +1,4 @@
+Manifest-Version: 1.0
+Class-Path: Dorg.slf4j.simpleLogger.defaultLogLevel=INFO
+Main-Class: net.serichat.Main
+

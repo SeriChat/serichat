@@ -39,6 +39,7 @@ public class SeriEvent implements Serializable {
     }
 
     public SeriEvent(EventType type, String groupName, byte[] chatMsg, String senderNickName) {
+        this.type = type;
         this.groupName = groupName;
         this.chatMsg = chatMsg;
         this.senderNickName = senderNickName;
@@ -47,6 +48,7 @@ public class SeriEvent implements Serializable {
     public SeriEvent(EventType type, String groupName, PeerAddress joinedPeer) {
         this.type = type;
         this.joinedPeer = joinedPeer;
+        this.groupName = groupName;
     }
 
     public SeriEvent(byte[] serializedEvent) {
@@ -55,11 +57,13 @@ public class SeriEvent implements Serializable {
             this.type = seriEvent.getType();
             this.password = seriEvent.getPassword();
             this.senderNickName = seriEvent.getSenderNickName();
-            this.chatMsg = getChatMsg();
+            this.chatMsg = seriEvent.getChatMsg();
             this.groupName = seriEvent.getGroupName();
             this.ownerNickName = seriEvent.getOwnerNickName();
             this.grpSecretKey = seriEvent.getGrpSecretKey();
             this.publicKey = seriEvent.getPublicKey();
+            this.senderNickName = seriEvent.getSenderNickName();
+            this.joinedPeer = seriEvent.getJoinedPeer();
         } catch (IOException e) {
             e.printStackTrace();
         } catch (ClassNotFoundException e) {
